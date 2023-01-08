@@ -34,7 +34,10 @@ Update logic:
 ## Example
 
 ```php
-$remoteItems = Country::createFromApi($this->countryApiClient->getCountries());
+$remoteItems = array_map(
+    static fn(array $a) => Country::createFromApi($a),
+    $this->countryApiClient->getCountries()
+);
 $localItems = $this->countryRepository->findAll();
 $syncResult = $this->itemSyncer->syncArchiving($remoteItems, $localItems);
 
