@@ -31,3 +31,12 @@ Update logic:
   * `syncArchiving`: if local item has method `archive` then archive local item
   * `syncRemoving`: remove local items
 
+## Example
+
+```php
+$remoteItems = Country::createFromApi($this->countryApiClient->getCountries());
+$localItems = $this->countryRepository->findAll();
+$syncResult = $this->itemSyncer->syncArchiving($remoteItems, $localItems);
+
+print_r($syncResult->stat()); // something like ['created' => 2, 'updated' => 180]
+```
