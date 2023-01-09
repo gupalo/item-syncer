@@ -6,5 +6,5 @@ interface SyncableEntityInterface
 {
     public function getIndexValue(): string;
 
-    public function updateFromItem($item): self;
+    public function updateFromItem($item): ?self;
 }

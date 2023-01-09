@@ -1,54 +1,49 @@
-<?php
+<?php /** @noinspection PhpUnused */
 
 namespace Gupalo\ItemSyncer;
 
-use Doctrine\ORM\EntityManagerInterface;
+use Throwable;
 
 class ItemSyncer
 {
-    public function __construct(
-        private readonly EntityManagerInterface $entityManager,
-    ) {
+    /**
+     * @param SyncableEntityInterface[] $remoteItems
+     * @param SyncableEntityInterface[] $localItems
+     */
+    public function diffKeeping(iterable $remoteItems, iterable $localItems): ItemSyncerDiff
+    {
+        return $this->diff($remoteItems, $localItems, ItemSyncerModeEnum::Keep);
     }
 
     /**
      * @param SyncableEntityInterface[] $remoteItems
      * @param SyncableEntityInterface[] $localItems
      */
-    public function syncKeeping(iterable $remoteItems, iterable $localItems): ItemSyncerResult
+    public function diffArchiving(iterable $remoteItems, iterable $localItems): ItemSyncerDiff
     {
-        return $this->doSync($remoteItems, $localItems, ItemSyncerModeEnum::Keep);
+        return $this->diff($remoteItems, $localItems, ItemSyncerModeEnum::Archive);
     }
 
     /**
      * @param SyncableEntityInterface[] $remoteItems
      * @param SyncableEntityInterface[] $localItems
      */
-    public function syncArchiving(iterable $remoteItems, iterable $localItems): ItemSyncerResult
+    public function diffRemoving(iterable $remoteItems, iterable $localItems): ItemSyncerDiff
     {
-        return $this->doSync($remoteItems, $localItems, ItemSyncerModeEnum::Archive);
+        return $this->diff($remoteItems, $localItems, ItemSyncerModeEnum::Remove);
     }
 
     /**
      * @param SyncableEntityInterface[] $remoteItems
      * @param SyncableEntityInterface[] $localItems
      */
-    public function syncRemoving(iterable $remoteItems, iterable $localItems): ItemSyncerResult
+    public function diff(iterable $remoteItems, iterable $localItems, ItemSyncerModeEnum $actionMissing): ItemSyncerDiff
     {
-        return $this->doSync($remoteItems, $localItems, ItemSyncerModeEnum::Remove);
-    }
-
-    /**
-     * @param SyncableEntityInterface[] $remoteItems
-     * @param SyncableEntityInterface[] $localItems
-     */
-    private function doSync(iterable $remoteItems, iterable $localItems, ItemSyncerModeEnum $actionMissing): ItemSyncerResult
-    {
-        $countCreated = 0;
-        $countUpdated = 0;
-        $countArchived = 0;
-        $countRemoved = 0;
-        $countKept = 0;
+        $createdItems = [];
+        $updatedItems = [];
+        $archivedItems = [];
+        $removedItems = [];
+        $keptItems = [];
 
         $remoteItemsIndexed = [];
         foreach ($remoteItems as $remoteItem) {
@@ -67,42 +62,57 @@ class ItemSyncer
         $updateIds = array_intersect($localIds, $remoteIds);
 
         foreach ($createIds as $id) {
-            $countCreated++;
-            $this->entityManager->persist($remoteItemsIndexed[$id]);
+            $createdItems[$id] = $remoteItemsIndexed[$id];
         }
 
         if (in_array($actionMissing, [ItemSyncerModeEnum::Archive, ItemSyncerModeEnum::Remove], true)) {
             foreach ($archiveIds as $id) {
                 $item = $localItemsIndexed[$id];
-                if ($actionMissing === ItemSyncerModeEnum::Archive && method_exists($item, 'archive')) {
-                    $countArchived++;
-                    $item->archive();
-                    $this->entityManager->persist($item);
+                if ($actionMissing === ItemSyncerModeEnum::Archive) {
+                    $isArchived = false;
+                    try {
+                        if (method_exists($item, 'isArchived') && $item->isArchived()) {
+                            $isArchived = true;
+                        }
+                    } catch (Throwable) {
+                    }
+                    try {
+                        if (!$isArchived && method_exists($item, 'getArchivedAt') && $item->getArchivedAt()) {
+                            $isArchived = true;
+                        }
+                    } catch (Throwable) {
+                    }
+
+                    if ($isArchived) { // already archived
+                        $keptItems[$id] = $localItemsIndexed[$id];
+                    } else {
+                        $archivedItems[$id] = $item;
+                    }
                 } elseif ($actionMissing === ItemSyncerModeEnum::Remove) {
-                    $countRemoved++;
-                    $this->entityManager->remove($item);
+                    $removedItems[$id] = $item;
                 }
             }
         } else {
-            $countKept = count($archiveIds);
-        }
-
-        foreach ($updateIds as $id) {
-            $countUpdated++;
-            $item = $localItemsIndexed[$id];
-            if ($item->updateFromItem($remoteItemsIndexed[$id])) {
-                $this->entityManager->persist($item);
+            foreach ($archiveIds as $id) {
+                $keptItems[$id] = $localItemsIndexed[$id];
             }
         }
 
-        $this->entityManager->flush();
+        foreach ($updateIds as $id) {
+            $item = $localItemsIndexed[$id];
+            if ($item->updateFromItem($remoteItemsIndexed[$id])) {
+                $updatedItems[$id] = $remoteItemsIndexed[$id];
+            } else { // not changed
+                $keptItems[$id] = $localItemsIndexed[$id];
+            }
+        }
 
-        return new ItemSyncerResult(
-            created: $countCreated,
-            updated: $countUpdated,
-            archived: $countArchived,
-            removed: $countRemoved,
-            kept: $countKept,
+        return new ItemSyncerDiff(
+            createdItems: $createdItems,
+            updatedItems: $updatedItems,
+            archivedItems: $archivedItems,
+            removedItems: $removedItems,
+            keptItems: $keptItems,
         );
     }
 }

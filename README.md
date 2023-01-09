@@ -31,6 +31,9 @@ Update logic:
   * `syncArchiving`: if local item has method `archive` then archive local item
   * `syncRemoving`: remove local items
 
+If you use Doctrine and save diff to database then use `DbItemSyncer`. If you have your own logic of processing diff
+then use ItemSyncer and its `diffKeeping`, `diffArchiving`, `diffRemoving` methods.
+
 ## Example
 
 ```php
@@ -39,7 +42,7 @@ $remoteItems = array_map(
     $this->countryApiClient->getCountries()
 );
 $localItems = $this->countryRepository->findAll();
-$syncResult = $this->itemSyncer->syncArchiving($remoteItems, $localItems);
+$diff = $this->dbItemSyncer->syncArchiving($remoteItems, $localItems);
 
-print_r($syncResult->stat()); // something like ['created' => 2, 'updated' => 180]
+print_r($diff->stat()); // something like ['created' => 2, 'updated' => 180]
 ```
