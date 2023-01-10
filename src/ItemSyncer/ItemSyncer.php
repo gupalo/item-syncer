@@ -102,7 +102,7 @@ class ItemSyncer
             $item = $localItemsIndexed[$id];
             $updatedItem = $item->updateFromItem($remoteItemsIndexed[$id]);
             if ($updatedItem) {
-                $updatedItems[$id] = $remoteItemsIndexed[$id];
+                $updatedItems[$id] = $updatedItem;
             } else { // not changed
                 $keptItems[$id] = $localItemsIndexed[$id];
             }
