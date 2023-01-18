@@ -100,7 +100,12 @@ class ItemSyncer
 
         foreach ($updateIds as $id) {
             $item = $localItemsIndexed[$id];
-            $updatedItem = $item->updateFromItem($remoteItemsIndexed[$id]);
+
+            if ($item instanceof SyncableComparableEntityInterface && $item->equals($remoteItemsIndexed[$id])) {
+                $updatedItem = null;
+            } else {
+                $updatedItem = $item->updateFromItem($remoteItemsIndexed[$id]);
+            }
             if ($updatedItem) {
                 $updatedItems[$id] = $updatedItem;
             } else { // not changed
