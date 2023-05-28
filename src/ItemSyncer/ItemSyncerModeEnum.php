@@ -2,9 +2,9 @@
 
 namespace Gupalo\ItemSyncer;
 
-enum ItemSyncerModeEnum
+enum ItemSyncerModeEnum: string
 {
-    case Keep;
-    case Archive;
-    case Remove;
+    case Keep = 'Keep';
+    case Archive = 'Archive';
+    case Remove = 'Remove';
 }
